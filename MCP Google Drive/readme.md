@@ -102,13 +102,3 @@ mcp dev server.py
 * `file_id` (string, required): The Google Drive File ID.
 
 
-
----
-
-## License
-
-MIT License
-
-```
-
-```
