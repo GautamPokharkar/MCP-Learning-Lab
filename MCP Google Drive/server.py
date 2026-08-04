@@ -8,14 +8,14 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
-from mcp.server import MCPServer
+from mcp.server.fastmcp import FastMCP  
 
 SCOPES = ["https://www.googleapis.com/auth/drive.readonly"]
 BASE_DIR = Path(__file__).resolve().parent
 CREDENTIALS_FILE = BASE_DIR / "credentials.json"
 TOKEN_FILE = BASE_DIR / "token.json"
 
-mcp = MCPServer("Google Drive")
+mcp = FastMCP("Google Drive")
 
 
 def get_drive_service():
@@ -60,6 +60,107 @@ def search_files(query: str, limit: int = 5) -> str:
         return "\n".join(
             f"{item['name']} | {item['id']} | {item.get('mimeType', '')} | {item.get('modifiedTime', '')}"
             for item in files
+        )
+    except HttpError as e:
+        return f"Drive API error: {e}"
+
+
+@mcp.tool()
+def list_recent_files(limit: int = 10) -> str:
+    """List the most recently modified files in Google Drive."""
+    try:
+        service = get_drive_service()
+        results = service.files().list(
+            q="trashed = false",
+            orderBy="modifiedTime desc",
+            pageSize=limit,
+            fields="files(id, name, mimeType, modifiedTime)",
+            corpora="user",
+        ).execute()
+
+        files = results.get("files", [])
+        if not files:
+            return "No recent files found."
+
+        return "\n".join(
+            f"{item['name']} | {item['id']} | {item.get('mimeType', '')} | {item.get('modifiedTime', '')}"
+            for item in files
+        )
+    except HttpError as e:
+        return f"Drive API error: {e}"
+
+
+@mcp.tool()
+def list_pdfs(limit: int = 10) -> str:
+    """List all PDF files stored in Google Drive."""
+    try:
+        service = get_drive_service()
+        results = service.files().list(
+            q="mimeType = 'application/pdf' and trashed = false",
+            orderBy="modifiedTime desc",
+            pageSize=limit,
+            fields="files(id, name, mimeType, modifiedTime)",
+            corpora="user",
+        ).execute()
+
+        files = results.get("files", [])
+        if not files:
+            return "No PDF files found."
+
+        return "\n".join(
+            f"{item['name']} | {item['id']} | {item.get('modifiedTime', '')}"
+            for item in files
+        )
+    except HttpError as e:
+        return f"Drive API error: {e}"
+
+
+@mcp.tool()
+def search_pdfs(query: str, limit: int = 5) -> str:
+    """Search for PDF files by name or keyword."""
+    try:
+        service = get_drive_service()
+        safe_query = query.replace("'", "\\'")
+        results = service.files().list(
+            q=f"mimeType = 'application/pdf' and name contains '{safe_query}' and trashed = false",
+            pageSize=limit,
+            fields="files(id, name, mimeType, modifiedTime)",
+            corpora="user",
+        ).execute()
+
+        files = results.get("files", [])
+        if not files:
+            return "No matching PDF files found."
+
+        return "\n".join(
+            f"{item['name']} | {item['id']} | {item.get('modifiedTime', '')}"
+            for item in files
+        )
+    except HttpError as e:
+        return f"Drive API error: {e}"
+
+
+@mcp.tool()
+def get_file_metadata(file_id: str) -> str:
+    """Get detailed metadata about a specific file (size, owners, timestamps, links)."""
+    try:
+        service = get_drive_service()
+        fields = "id, name, mimeType, size, createdTime, modifiedTime, owners(displayName, emailAddress), webViewLink, shared"
+        file = service.files().get(fileId=file_id, fields=fields).execute()
+
+        owners = ", ".join([f"{o.get('displayName', '')} ({o.get('emailAddress', '')})" for o in file.get("owners", [])])
+        size_bytes = file.get("size", "N/A (Google Doc/Folder)")
+
+        return (
+            f"File Name: {file.get('name')}\n"
+            f"ID: {file.get('id')}\n"
+            f"Type: {file.get('mimeType')}\n"
+            f"Size: {size_bytes} bytes\n"
+            f"Created: {file.get('createdTime')}\n"
+            f"Last Modified: {file.get('modifiedTime')}\n"
+            f"Owners: {owners}\n"
+            f"Shared: {file.get('shared', False)}\n"
+            f"Web Link: {file.get('webViewLink')}"
         )
     except HttpError as e:
         return f"Drive API error: {e}"
