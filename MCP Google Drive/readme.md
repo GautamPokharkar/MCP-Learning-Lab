@@ -21,7 +21,7 @@ An Model Context Protocol (MCP) server written in Python that enables AI assista
 ## Directory Structure
 
 ```text
-/
+MCP Google Drive/
 ├── server.py             # Main MCP server script (v2.0.0)
 ├── requirements.txt      # Python dependencies
 ├── credentials.json      # Google Cloud OAuth client credentials (user-supplied)
